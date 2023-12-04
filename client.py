@@ -3,6 +3,7 @@ import socket
 import threading
 import tkinter as tk
 from tkinter import scrolledtext, Entry, Button, simpledialog  # Added simpledialog
+import time
 
 class Client:
     # def __init__(self):
@@ -147,7 +148,7 @@ class Client:
         self.commands = {
             "/join": {
                 "desc": "Connect to the server application",
-                "usage": "/join",
+                "usage": "/join <server_ip_add> <port>",
                 "call": self.connect_to_server
             },
             "/leave": {
@@ -184,8 +185,8 @@ class Client:
 
         # Tkinter GUI setup
         self.root = tk.Tk()
-        self.root.title("File Exchange Client")
-        self.output_text = scrolledtext.ScrolledText(self.root, width=40, height=20)
+        self.root.title("Client File Exchange")
+        self.output_text = scrolledtext.ScrolledText(self.root, width=100, height=20)
         self.output_text.pack(padx=10, pady=10)
         self.input_entry = Entry(self.root, width=30)
         self.input_entry.pack(pady=5)
@@ -201,6 +202,8 @@ class Client:
             if isValid: 
                 res = self.commands[args[0]]["call"](args)
                 self.output_text.insert(tk.END, f"{res}\n")
+                if 'Error:' not in res:
+                    self.input_entry.delete(0, tk.END)
             else: 
                 raise Exception("Command not found.")
             
@@ -249,46 +252,103 @@ class Client:
 
     def disconnect_from_server(self, params):
         try:
-            if self.socket is None:
+            if len(params) != 1: 
+                raise Exception("Command parameters do not match or is not allowed.")
+            elif self.socket is None:
                 raise Exception("Disconnection failed. Please connect to the server first.")
-            self.socket.send('/leave ')
-            self.socket.close()
-            self.socket = None
-            msg = "Connection closed. Thank you!"
-            print(msg)
-            return msg
+            self.socket.send(f'/leave {self.handle}'.encode('utf-8'))
+            res = self.socket.recv(1024).decode('utf-8')
+            if res == "Connection closed. Thank you!":
+                self.socket.close()
+                self.socket = None
+                return res
+            else: 
+                raise Exception("Error: Disconnection failed.")
         except Exception as e:
             errorMsg = f"Error: {e}"
             print(errorMsg)
             return errorMsg
 
-    def register_handle(self, handle):
-        self.handle = handle
-        self.display_output(f"Welcome {handle}!")
+    def register_handle(self, params):
+        try:
+            if len(params) != 2:
+                raise Exception("Command parameters do not match or are not allowed.")
+            if self.handle is not None:
+                raise Exception("Already registered.")
+            user_handle = params[1]
+            if self.socket is None:
+                raise Exception("Registration failed. Please connect to the server first.")
+            self.socket.send(f'/register {user_handle}'.encode('utf-8'))
+            # Receive the server's response
+            res = self.socket.recv(1024).decode('utf-8')
+            
+            if res == f"Welcome {user_handle}!":
+                self.handle = user_handle
+                return res
+            else:
+                raise Exception(res)
+        except Exception as e:
+            errorMsg = f"Error: {e}"
+            print(errorMsg)
+            return errorMsg
+
 
     def send_file_to_server(self, filename):
-        # Implement file sending logic
-        self.send_message(f"/store {filename}")
+        try:
+            with open(filename, "rb") as file:
+                file_data = file.read()
+                file_size = len(file_data)
 
-    def request_directory_list(self):
+                # Send the command to the server
+                self.send_message(f"/store {filename} {file_size}")
+
+                # Receive the server's acknowledgment
+                acknowledgment = self.server_socket.recv(1024).decode("utf-8")
+
+                if acknowledgment.startswith("Ready to receive"):
+                    # Send the file data to the server
+                    self.server_socket.sendall(file_data)
+
+                    # Display success message with timestamp
+                    timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+                    self.display_output(f"{self.handle}<{timestamp}>: Uploaded {filename}")
+                else:
+                    self.display_output(f"Server rejected the file: {acknowledgment}")
+        except FileNotFoundError:
+            self.display_output(f"Error: File '{filename}' not found.")
+        except Exception as e:
+            self.display_output(f"Error: {e}")
+
+
+    def request_directory_list(self, params):
         # Implement directory list request logic
-        self.send_message("/dir")
+        try:
+            # Send the command to the server
+            self.send_message("/dir")
+
+            # Receive the server's response
+            server_response = self.server_socket.recv(1024).decode("utf-8")
+
+            if server_response.startswith("Server Directory"):
+                # Display the server directory list
+                directory_list = server_response.split("\n")[1:]
+                self.display_output("Server Directory\n" + "\n".join(directory_list))
+            else:
+                self.display_output(f"Error: {server_response}")
+
+        except Exception as e:
+            self.display_output(f"Error: {e}")
+
 
     def fetch_file_from_server(self, filename):
         # Implement file fetching logic
         self.send_message(f"/get {filename}")
 
-    def show_commands(self):
-        for command, details in self.commands.items():
-            self.display_output(f"{command}: {details['desc']} (Usage: {details['usage']})")
-
-    def send_file(self, filename):
-        # Logic for sending a file to the server
-        self.send_file_to_server(filename)
-
-    def fetch_file(self, filename):
-        # Logic for fetching a file from the server
-        self.fetch_file_from_server(filename)
+    def show_commands(self, params):
+        msg = ""
+        for command in self.commands:
+            msg += f"{self.commands[command]['usage']} - {self.commands[command]['desc']}\n"
+        self.output_text.insert(tk.END, f"{msg}\n")
 
     def send_message(self, message):
         try:

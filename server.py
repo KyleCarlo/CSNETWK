@@ -10,20 +10,15 @@ class Server:
         self.serverSocket.listen()
         self.clients = {}
         self.commands = {
-            "/join": {
-                "desc": "Connect to the server application",
-                "usage": "/join <server_ip_add> <port>",
-                "call": None
-            }, 
             "/leave": {
                 "desc": "Disconnect from the server application",
                 "usage": "/leave",
-                "call": None
+                "call": self.disconnect_client
             }, 
             "/register": {
                 "desc": "Register a unique handle or alias",
                 "usage": "/register <handle>",
-                "call": None
+                "call": self.register_handle
             },
             "/store":{
                 "desc": "Send file to server",
@@ -39,11 +34,6 @@ class Server:
                 "desc": "Fetch a file from a server",
                 "usage": "/get <filename>",
                 "call": None
-            },
-            "/?":{
-                "desc": "List of commands", 
-                "usage": "/?",
-                "call": None
             }
         }
 
@@ -58,33 +48,56 @@ class Server:
                 print(f"[ACTIVE CONNECTIONS] {threading.active_count() - 1}")
             
             except IOError:
-                #Send response message for file not found
-                response = 'ERROR'
-                connectionSocket.send(response.encode('utf-8'))
-            
-                #Close client socket
-                connectionSocket.close()
+                print("Error: Multithreading Error...")
 
     def handle_client(self, connectionSocket, addr):
         print(f"[NEW CONNECTION] {addr} connected.")
-        has_handle = False
         while True:
             try:
-                msg = connectionSocket.recv(1024).decode('utf-8').split(' ', 1)
+                data = connectionSocket.recv(1024).decode('utf-8')
                 
-                if msg[0] == "/leave" and not has_handle:
-                    print(f"[{addr}] left the server.")    
+                if not data:
+                    # Empty string received, client disconnected
+                    print(f"[DISCONNECTED] {addr} disconnected.")
                     break
-                # if msg[0] == "/leave":
-                #     self.disconnect_client(connectionSocket, addr)
-                #     break
-                # if msg[0] == '/register':
-                #     print(msg)
+
+                command = data.split(' ')
+                if isinstance(command, str):
+                    args = [command]
+                elif isinstance(command, list):
+                    args = command
+
+                if args[0] == '/register':
+                    args.append(connectionSocket)
+                    args.append(addr)
+                
+                res = self.commands[args[0]]["call"](args)
+                connectionSocket.send(res.encode('utf-8'))
 
             except Exception as e:
                 print(f"[ERROR] {str(e)}")
-                self.disconnect_client(connectionSocket, addr)
                 break
+
+    def register_handle(self, params):
+        try:
+            if params[1] in self.clients.keys():
+                raise Exception("Registration failed. Handle or alias already exists.")
+            self.clients[params[1]] = {"socket" : params[2], "address" : params[3]}
+            return f"Welcome {params[1]}!"
+        except Exception as e:
+            errorMsg = f"{e}"
+            print("Error:", errorMsg)
+            return errorMsg
+
+    def disconnect_client(self, params):
+        try:
+            if params[1] is not None and params[1] in self.clients.keys():
+                del self.clients[params[1]]
+            return "Connection closed. Thank you!"
+        except Exception as e:
+            errorMsg = f"{e}"
+            print("Error:", errorMsg)
+            return errorMsg
 
 server = Server()
 #     def __init__(self, host, port):
