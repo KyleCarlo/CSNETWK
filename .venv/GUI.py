@@ -7,7 +7,7 @@ app.config['SECRET_KEY'] = '27775abec6ae9ab48a0ec296e09b44bc'
 client = Client()
 cout = [""]
 
-@app.route('/', methods=['GET','POST'])
+@app.route('/', methods=['GET', 'POST'])
 def home():
     consoleInput = Console()
     messageInput = Message()
@@ -17,16 +17,11 @@ def home():
     if consoleInput.validate_on_submit():
         if consoleInput.console_input_field.data:
             command = consoleInput.console_input_field.data
-            print(cout)
             cout.append(client.start_console(command))
 
-    if messageInput.validate_on_submit():
-        if messageInput.message_input_field.data:
-            message = messageInput.message_input_field.data
-
     return render_template(
-        'index.html', 
-        console=consoleInput, 
+        'index.html',
+        console=consoleInput,
         message=messageInput,
         cout=cout
     )
