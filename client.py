@@ -4,11 +4,145 @@ import threading
 import tkinter as tk
 from tkinter import scrolledtext, Entry, Button, simpledialog  # Added simpledialog
 
-class FileExchangeClient:
-    def __init__(self, handle):
-        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.handle = handle
+class Client:
+    # def __init__(self):
+    #     # Tkinter GUI setup
+    #     self.root = tk.Tk()
+    #     self.root.title("File Exchange Client")
+    #     self.output_text = scrolledtext.ScrolledText(self.root, width=40, height=20)
+    #     self.output_text.pack(padx=10, pady=10)
+    #     self.input_entry = Entry(self.root, width=30)
+    #     self.input_entry.pack(pady=5)
+    #     self.send_button = Button(self.root, text="Send", command=None)
+    #     self.send_button.pack(pady=5)
 
+    #     self.server_host = None
+    #     self.server_port = None
+    #     self.socket = None
+    #     self.commands = {
+    #         "/join": {
+    #             "desc": "Connect to the server application",
+    #             "usage": "/join <server_ip_add> <port>",
+    #             "call": self.connect
+    #         }, 
+    #         "/leave": {
+    #             "desc": "Disconnect from the server application",
+    #             "usage": "/leave",
+    #             "call": self.disconnect
+    #         }, 
+    #         "/register": {
+    #             "desc": "Register a unique handle or alias",
+    #             "usage": "/register <handle>",
+    #             "call": None
+    #         },
+    #         "/store":{
+    #             "desc": "Send file to server",
+    #             "usage": "/store <filename>",
+    #             "call": None
+    #         }, 
+    #         "/dir": {
+    #             "desc": "Request directory file list from a server",
+    #             "usage": "/dir",
+    #             "call": None
+    #         }, 
+    #         "/get":{
+    #             "desc": "Fetch a file from a server",
+    #             "usage": "/get <filename>",
+    #             "call": None
+    #         },
+    #         "/?":{
+    #             "desc": "List of commands", 
+    #             "usage": "/?",
+    #             "call": self.commands
+    #         }
+    #     }
+
+    # # GUI
+    # def send_user_input(self):
+    #     user_input = self.input_entry.get()
+    #     self.process_user_input(user_input)
+
+    # def start_console(self, command):
+    #     try:
+    #         isValid, args = self.check_command(command)
+    #         if isValid: 
+    #             return self.commands[args[0]]["call"](args)
+    #         else: 
+    #             raise Exception("Command not found.")
+            
+    #     except Exception as e:
+    #         errorMsg = f"Error: {e}"
+    #         print(errorMsg)
+    #         return errorMsg
+
+    # def check_command(self, params):
+    #     if len(params) == 0:
+    #         return False, None
+    #     else:
+    #         args = params.split(" ")
+    #         if isinstance(args, str):
+    #             args = [args]
+
+    #         if args[0] in self.commands.keys():
+    #             return True, args
+    #         else:
+    #             return False, None
+
+    # def connect(self, params):
+    #     try:
+    #         if len(params) != 3 or not params[2].isdigit(): 
+    #             raise Exception("Command parameters do not match or is not allowed.")
+    #         # elif self.socket is not None:
+    #         #     raise Exception("Connection to the Server is already established.")
+    #         self.server_host = params[1]
+    #         self.server_port = int(params[2])
+    #         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        
+    #         self.socket.connect((self.server_host, self.server_port))
+    #         msg = "Connection to the File Exchange Server is successful!"
+    #         print(msg)
+    #         return msg
+    #     except ConnectionError as ce:
+    #         self.socket = None
+    #         msg = f"Error: Connection to the Server has failed! Please check IP Address and Port Number."
+    #         print(msg)
+    #         return msg
+    #     except Exception as e:
+    #         errorMsg = f"Error: {e}"
+    #         print(errorMsg)
+    #         return errorMsg
+
+    # def disconnect(self, params):
+    #     try:
+    #         if self.socket is None:
+    #             raise Exception("Disconnection failed. Please connect to the server first.")
+    #         self.socket.close()
+    #         self.socket = None
+    #         msg = "Connection closed. Thank you!"
+    #         print(msg)
+    #         return msg
+    #     except Exception as e:
+    #         errorMsg = f"Error: {e}"
+    #         print(f"Error: {e}")
+    #         return errorMsg
+
+    # def send_user_input(self, params): pass
+
+    # def commands(self, params):
+    #     print('-' * 20)
+    #     print("List of commands")
+    #     msg = []
+    #     for command in self.commands: 
+    #         print(self.commands[command]['desc'])
+    #         print(self.commands[command]['usage'])
+    #         msg.append(command + "\n - " + self.commands[command]['desc'] + "\n - " + self.commands[command]['usage'])
+    #     print('-' * 20)
+    #     return 
+
+    def __init__(self):
+        self.handle = None
+        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.socket = None
         # Define commands
         self.commands = {
             "/join": {
@@ -58,14 +192,75 @@ class FileExchangeClient:
         self.send_button = Button(self.root, text="Send", command=self.send_user_input)
         self.send_button.pack(pady=5)
 
-    def connect_to_server(self, server_ip, port):
-        self.server_socket.connect((server_ip, port))
-        self.server_socket.send(self.handle.encode("utf-8"))
-        threading.Thread(target=self.receive_messages).start()
+    # sends user input to the server
+    def send_user_input(self):
+        command = self.input_entry.get()
+        # self.output_text.insert(tk.END, f"User Input: {command}\n")
+        try:
+            isValid, args = self.check_command(command)
+            if isValid: 
+                res = self.commands[args[0]]["call"](args)
+                self.output_text.insert(tk.END, f"{res}\n")
+            else: 
+                raise Exception("Command not found.")
+            
+        except Exception as e:
+            errorMsg = f"Error: {e}"
+            print(errorMsg)
+            self.output_text.insert(tk.END, f"{errorMsg}\n")
 
-    def disconnect_from_server(self):
-        self.server_socket.close()
-        self.display_output("Connection closed. Thank you!")
+    # checks if the command is valid
+    def check_command(self, params):
+        if len(params) == 0:
+            return False, None
+        else:
+            args = params.split(" ")
+            if isinstance(args, str):
+                args = [args]
+
+            if args[0] in self.commands.keys():
+                return True, args
+            else:
+                return False, None
+    
+    def connect_to_server(self, params):
+        try:
+            if len(params) != 3 or not params[2].isdigit(): 
+                raise Exception("Command parameters do not match or is not allowed.")
+            elif self.socket is not None:
+                raise Exception("Connection to the Server is already established.")
+            server_host = params[1]
+            server_port = int(params[2])
+            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        
+            self.socket.connect((server_host, server_port))
+            msg = "Connection to the File Exchange Server is successful!"
+            print(msg)
+            return msg
+        except ConnectionError as ce:
+            self.socket = None
+            msg = f"Error: Connection to the Server has failed! Please check IP Address and Port Number."
+            print(msg)
+            return msg
+        except Exception as e:
+            errorMsg = f"Error: {e}"
+            print(errorMsg)
+            return errorMsg
+
+    def disconnect_from_server(self, params):
+        try:
+            if self.socket is None:
+                raise Exception("Disconnection failed. Please connect to the server first.")
+            self.socket.send('/leave ')
+            self.socket.close()
+            self.socket = None
+            msg = "Connection closed. Thank you!"
+            print(msg)
+            return msg
+        except Exception as e:
+            errorMsg = f"Error: {e}"
+            print(errorMsg)
+            return errorMsg
 
     def register_handle(self, handle):
         self.handle = handle
@@ -87,19 +282,6 @@ class FileExchangeClient:
         for command, details in self.commands.items():
             self.display_output(f"{command}: {details['desc']} (Usage: {details['usage']})")
 
-    def process_user_input(self, user_input):
-        parts = user_input.split(" ", 1)
-        command = parts[0].lower()
-
-        if command in self.commands:
-            if len(parts) > 1:
-                arguments = parts[1]
-            else:
-                arguments = ""
-            self.commands[command]["call"](arguments)
-        else:
-            self.display_output("Error: Command not found.")
-
     def send_file(self, filename):
         # Logic for sending a file to the server
         self.send_file_to_server(filename)
@@ -107,10 +289,6 @@ class FileExchangeClient:
     def fetch_file(self, filename):
         # Logic for fetching a file from the server
         self.fetch_file_from_server(filename)
-
-    def send_user_input(self):
-        user_input = self.input_entry.get()
-        self.process_user_input(user_input)
 
     def send_message(self, message):
         try:
@@ -138,5 +316,7 @@ class FileExchangeClient:
 
 
 if __name__ == "__main__":
-    client = FileExchangeClient("Alice")
+    client = Client()
     client.root.mainloop()
+# client = Client()
+# client.start_console()
