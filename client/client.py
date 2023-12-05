@@ -175,6 +175,16 @@ class Client:
                 "usage": "/get <filename>",
                 "call": self.fetch_file_from_server
             },
+            "/msg": {
+                "desc": "Message another client connected to the server",
+                "usage": "/message <client_name> <message>",
+                "call": self.message
+            },
+            "/msgall": {
+                "desc": "Message clients connected to the server",
+                "usage": "/msgall <message>",
+                "call": self.message_all
+            },
             "/?": {
                 "desc": "List of commands",
                 "usage": "/?",
@@ -302,12 +312,15 @@ class Client:
                 raise Exception("Cannot send file. Please register first.")
             
             filename = params[1]
+            dir = os.path.dirname(os.path.abspath(__file__))
+            dir_files = os.listdir(dir)
 
-            if not os.path.exists(filename):
+            if filename not in dir_files:
                 raise Exception("File not found.")
             
             self.socket.send(f"/store {self.handle} {filename}".encode('utf-8'))
             
+            filename = dir + '\\' + filename
             with open(filename, 'rb') as file:
                 file_data = file.read(1024)
                 while file_data:
@@ -324,7 +337,6 @@ class Client:
                 return res
             else:
                 raise Exception(res)
-            
 # with open(filename, 'rb') as file:
     
 #     # self.client_socket.send(f"/store {filename}".encode('utf-8'))  # Start of file transmission
@@ -369,27 +381,40 @@ class Client:
         #     self.display_output(f"Error: File '{filename}' not found.")
         # except Exception as e:
         #     self.display_output(f"Error: {e}")
-
+    def message(self, params):
+        pass
+        
+    def message_all(self, params):
+        pass
 
     def request_directory_list(self, params):
         # Implement directory list request logic
+        # try:
+        #     # Send the command to the server
+        #     self.send_message("/dir")
+
+        #     # Receive the server's response
+        #     server_response = self.server_socket.recv(1024).decode("utf-8")
+
+        #     if server_response.startswith("Server Directory"):
+        #         # Display the server directory list
+        #         directory_list = server_response.split("\n")[1:]
+        #         self.display_output("Server Directory\n" + "\n".join(directory_list))
+        #     else:
+        #         self.display_output(f"Error: {server_response}")
+
+        # except Exception as e:
+        #     self.display_output(f"Error: {e}")
         try:
-            # Send the command to the server
-            self.send_message("/dir")
-
-            # Receive the server's response
-            server_response = self.server_socket.recv(1024).decode("utf-8")
-
-            if server_response.startswith("Server Directory"):
-                # Display the server directory list
-                directory_list = server_response.split("\n")[1:]
-                self.display_output("Server Directory\n" + "\n".join(directory_list))
-            else:
-                self.display_output(f"Error: {server_response}")
-
+            if len(params) != 1:
+                raise Exception("Command parameters do not match or are not allowed.")
+            if self.socket is None:
+                raise Exception("Cannot check file directory. Please connect to the server first.")
+            self.socket.send("/dir".encode('utf-8'))
         except Exception as e:
-            self.display_output(f"Error: {e}")
-
+            errorMsg = f"Error: {e}"
+            print(errorMsg)
+            return errorMsg
 
     def fetch_file_from_server(self, filename):
         # Implement file fetching logic

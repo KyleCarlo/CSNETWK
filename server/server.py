@@ -36,7 +36,17 @@ class Server:
                 "desc": "Fetch a file from a server",
                 "usage": "/get <filename>",
                 "call": None
-            }
+            },
+            "/msg": {
+                "desc": "Message another client connected to the server",
+                "usage": "/message <client_name> <message>",
+                "call": self.message
+            },
+            "/msgall": {
+                "desc": "Message clients connected to the server",
+                "usage": "/msgall <message>",
+                "call": self.message_all
+            },
         }
 
         while True:
@@ -108,33 +118,43 @@ class Server:
     def store_file(self, params):
         try:
             connectionSocket = params[3]
-            filename = 'server_files/' + params[2]
-            if not os.path.exists('server_files/'):
-                os.makedirs('server_files/')
+            filename = params[2]
+            dir = os.path.dirname(os.path.abspath(__file__))
+            dir_files = os.listdir(dir)
+            print("dir", dir)
+            print("files", dir_files)
+
+            if 'server_files' not in dir_files:
+                os.mkdir(dir + '/server_files')
+
+            dir_files = os.listdir(dir + '\\server_files')
             
-            if os.path.exists(filename):
+            if filename in dir_files:
                 i = 1
                 actual_file = filename.split('.')
-                filename = ''
+
                 if isinstance(actual_file, list):
-                    for i in range(len(actual_file) - 2):
-                        filename += actual_file[i]
-                        if i != len(actual_file) - 3:
+                    filename = ''
+                    for j in range(len(actual_file) - 1):
+                        filename += actual_file[j]
+                        if j != len(actual_file) - 2:
                             filename += '.'
-                    while os.path.exists(f'{actual_file[0]} ({i}).{actual_file[1]}'):
+
+                    while (f'{filename} ({i}).{actual_file[-1]}') in dir_files:
                         i += 1
-                    filename = f'{actual_file[0]} ({i}).{actual_file[1]}'
+                    filename = f'{filename} ({i}).{actual_file[-1]}'
                 else:
                     filename = actual_file
-                    while os.path.exists(f'{filename} ({i})'):
+                    while (f'{filename} ({i})') in dir_files:
                         i += 1
                     filename = f'{filename} ({i})'
+            
+            filename = dir + '\\server_files\\' + filename
             
             with open(filename, 'wb') as file:
                 while True:
                     data = connectionSocket.recv(1024)
                     if b"<<EOF>>" in data:
-                        print("reading complete")
                         break
                     file.write(data)                
                 file.close()
@@ -150,11 +170,13 @@ class Server:
             return errorMsg
 
     def get_dir(self, params):
-        list_dir = os.listdir('/')
+        list_dir = os.listdir(os.getcwd() + '/server_files')
         print(list_dir)
-        # print("LIST DIR\n", os.listdir())
         return list_dir
 
+    def message(self, params): pass
+    def message_all(self, params): pass
+    
 server = Server()
 #     def __init__(self, host, port):
 #         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
