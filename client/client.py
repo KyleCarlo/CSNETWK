@@ -3,12 +3,13 @@ import socket
 import tkinter as tk
 from tkinter import scrolledtext, Entry, Button, simpledialog  # Added simpledialog
 import os
+import threading
 class Client:
     def __init__(self):
         self.handle = None
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket = None
-        # Define commands
+        self.recv_message = True
         self.commands = {
             "/join": {
                 "desc": "Connect to the server application",
@@ -74,10 +75,12 @@ class Client:
 
     # sends user input to the server
     def send_user_input(self):
+        
         command = self.input_entry.get()
-        # self.output_text.insert(tk.END, f"User Input: {command}\n")
+        
         try:
             isValid, args = self.check_command(command)
+
             if isValid: 
                 res = self.commands[args[0]]["call"](args)
                 self.output_text.insert(tk.END, f"{res}\n")
@@ -171,7 +174,6 @@ class Client:
             print(errorMsg)
             return errorMsg
 
-
     def send_file_to_server(self, params):
         try:
             if len(params) != 2:
@@ -231,6 +233,35 @@ class Client:
             return errorMsg
 
     def message(self, params):
+        # params[0] = /msg
+        # params[1] = client_name
+        # params[2] = destination_client_name
+        # params[3] = message
+        try:
+            if len(params) != 3:
+                raise Exception("Command parameters do not match or are not allowed.")
+            if self.socket is None:
+                raise Exception("Cannot send message. Please connect to the server first.")
+            if self.handle is None:
+                raise Exception("Cannot send message. Please register first.")
+            
+            destination_client_name = params[1]
+            message = params[2]
+
+            self.socket.send(f"/msg {self.handle} {destination_client_name} {message}".encode('utf-8'))
+            res = self.socket.recv(1024).decode('utf-8')
+
+            if res == "Message sent.":
+                print(res)
+                return res
+            else:
+                raise Exception(res)
+        except Exception as e:
+            errorMsg = f"Error: {e}"
+            print(errorMsg)
+            return errorMsg
+
+    def receive(self):
         pass
         
     def message_all(self, params):
@@ -311,39 +342,13 @@ class Client:
             return errorMsg
 
     def show_commands(self, params):
-        msg = "Commands:\n-----------------------\n"
+        msg = msg = "----------------------\n|| COMMANDS ||\n- "
         for command in self.commands:
             msg += f"{self.commands[command]['usage']} - {self.commands[command]['desc']}\n"
+        msg += "\n----------------------\n"
         print(msg)
         return msg
-
-    def send_message(self, message):
-        try:
-            self.server_socket.send(message.encode("utf-8"))
-        except Exception as e:
-            print(f"Error: {e}")
-
-    def receive_messages(self):
-        while True:
-            try:
-                message = self.server_socket.recv(1024).decode("utf-8")
-                self.display_output(message)
-            except Exception as e:
-                break
-
-    def display_output(self, message):
-        print(message)
-        self.output_text.insert(tk.END, message + "\n")
-        self.output_text.see(tk.END)
-
-    def show_join_dialog(self):
-        server_ip = simpledialog.askstring("Server IP", "Enter Server IP Address:")
-        server_port = simpledialog.askinteger("Server Port", "Enter Server Port:")
-        return server_ip, server_port
-
 
 if __name__ == "__main__":
     client = Client()
     client.root.mainloop()
-# client = Client()
-# client.start_console()

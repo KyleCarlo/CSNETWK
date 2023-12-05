@@ -5,12 +5,18 @@ from datetime import datetime
 import os
 
 class Server:
+    # Initializing the server 
     def __init__(self):
+        # Set port to 12345
         self.serverPort = 12345
+        # Create a server socket and bind it to the localhost and port
         self.serverSocket = socket(AF_INET, SOCK_STREAM)
         self.serverSocket.bind(('127.0.0.1', self.serverPort))
+        # Start listening for connections
         self.serverSocket.listen()
-        self.clients = {}
+        # Initialize a dictionary to store clients
+        self.clients = {} # key: handle, values: (socket, address)
+        # Define the list of commands with description, usage, and method to call
         self.commands = {
             "/leave": {
                 "desc": "Disconnect from the server application",
@@ -54,23 +60,29 @@ class Server:
             }
         }
 
+        # Keep listening for connections
         while True:
-            #Establish the connection
             print('CSNETWK Web Server is ready to serve...')
             
             try:
+                # Accept an incoming connection
                 connectionSocket, addr = self.serverSocket.accept()
+                # Create a thread to handle the client
                 thread = threading.Thread(target=self.handle_client, args=(connectionSocket, addr))
                 thread.start()
+                # Display number of active connections
                 print(f"[ACTIVE CONNECTIONS] {threading.active_count() - 1}")
             
             except IOError:
+                # TODO:IDK WHAT TO DO HERE
                 print("Error: Multithreading Error...")
 
+    # Method to handle client connections
     def handle_client(self, connectionSocket, addr):
         print(f"[NEW CONNECTION] {addr} connected.")
         while True:
             try:
+                # Receive data from the client
                 data = connectionSocket.recv(1024).decode('utf-8')
                 
                 if not data:
@@ -78,60 +90,82 @@ class Server:
                     print(f"[DISCONNECTED] {addr} disconnected.")
                     break
 
+                # Split the received data to be saved as a list
                 command = data.split(' ')
                 if isinstance(command, str):
                     args = [command]
                 elif isinstance(command, list):
                     args = command
 
+                # If /register, append the client socket and address for later
                 if args[0] == '/register':
                     args.append(connectionSocket)
                     args.append(addr)
 
+                # If /store or /get, append the client socket for later
                 if args[0] == '/store' or args[0] == '/get':
                     args.append(connectionSocket)
 
+                # Call the corresponding method based on the args
+                # Store the response
                 res = self.commands[args[0]]["call"](args)
-                
+
+                # Send the response to the client socket
                 connectionSocket.send(res.encode('utf-8'))
 
             except Exception as e:
+                # Print the error
                 print(f"Error: {str(e)}")
                 break
-
+    
+    # Method to register the alias of the client
     def register_handle(self, params):
         try:
+            # Check if the handle is already existing
             if params[1] in self.clients.keys():
                 raise Exception("Registration failed. Handle or alias already exists.")
+            # Saving the client to the dictionary of clients
             self.clients[params[1]] = {"socket" : params[2], "address" : params[3]}
+            # Return a response to indicate successful registration
             return f"Welcome {params[1]}!"
         except Exception as e:
+            # Print the error
             errorMsg = f"{e}"
             print("Error:", errorMsg)
             return errorMsg
 
+    # Method to disconnect the client from the server
     def disconnect_client(self, params):
         try:
+            # Delete the client from the list of clients if registered
             if params[1] is not None and params[1] in self.clients.keys():
                 del self.clients[params[1]]
+            # Return a response to indicate succesful disconnection
             return "Connection closed. Thank you!"
         except Exception as e:
+            # Print the error
             errorMsg = f"{e}"
             print("Error:", errorMsg)
             return errorMsg
 
+    # Method to store a file sent by the client to the server
     def store_file(self, params):
         try:
+            # Save client socket and filename as variables
             connectionSocket = params[3]
             filename = params[2]
+            # Get the current directory and files inside
             dir = os.path.dirname(os.path.abspath(__file__))
             dir_files = os.listdir(dir)
 
+            # Create the folder 'server_files' to save the files
             if 'server_files' not in dir_files:
                 os.mkdir(dir + '/server_files')
 
+            # Get the list of files in the 'server_files' folder
             dir_files = os.listdir(dir + '\\server_files')
             
+            # Logic for appending -n to the nth version of the file with the same name
             if filename in dir_files:
                 i = 1
                 actual_file = filename.split('.')
@@ -152,16 +186,71 @@ class Server:
                         i += 1
                     filename = f'{filename}-{i}'
             
+            # Writing the file data to the newly created file
             with open(dir + '\\server_files\\' + filename, 'wb') as file:
                 while True:
+                    # Get 1024 bits of data at a time
                     data = connectionSocket.recv(1024)
+                    # If last chunk of data, write but excluding the EOF tag
                     if b"<<EOF>>" in data:
                         file.write(data[:-7])
                         break
+                    # Write to the file
                     file.write(data)                
                 file.close()
 
+            # Return a response indicating succesful storage of file in server
             msg = f"{params[1]} <{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}>: Uploaded {filename}"
+            print(msg)
+            return msg
+        except Exception as e:
+            # Print the error
+            errorMsg = f"{e}"
+            print("Error:", errorMsg)
+            return errorMsg
+    # Method to get the directory of files stored in the server
+    def get_dir(self, params):
+        try:
+            # Getting the path to the 'server_files' folder
+            dir = os.path.dirname(os.path.abspath(__file__)) + '\\server_files'
+            # Getting the list of files in the directory
+            dir_files = os.listdir(dir)
+            
+            # Preparing the message to be returned as response
+            msg = "----------------------\n|| SERVER DIRECTORY ||\n- " 
+            # Iterating through the files and adding the filenames to the response
+            for i in range(len(dir_files)):
+                msg += dir_files[i] + ('\n- ' if i != len(dir_files) - 1 else '')
+            msg += "\n----------------------\n"
+            # Return the response containing the files and indicating successful directory getting
+            return msg
+        except Exception as e:
+            # Print the error
+            errorMsg = f"{e}"
+            print("Error:", errorMsg)
+            return errorMsg
+    
+    # Method to get the list of other clients
+    def get_clients(self, params):
+        # Get the list of clients
+        clients = self.clients.keys()
+        # Remove requesting client from list
+        clients.remove(params[1])
+        # Return list of other clients, indicating successful retrieval
+        return clients
+    
+    # 
+    def message(self, params): 
+        try:
+            source_name = params[1]
+            dest_name = params[2]
+            msg = params[3]
+            if dest_name not in self.clients.keys():
+                raise Exception("Client not found in the server")
+            dest_socket = self.clients[dest_name]["socket"]
+            dest_socket.send(f"{source_name}: {msg}".encode('utf-8'))
+
+            msg = "Message sent."
             print(msg)
             return msg
         except Exception as e:
@@ -169,28 +258,6 @@ class Server:
             print("Error:", errorMsg)
             return errorMsg
 
-    def get_dir(self, params):
-        try:
-            dir = os.path.dirname(os.path.abspath(__file__)) + '\\server_files'
-            dir_files = os.listdir(dir)
-            msg = "----------------------\n|| SERVER DIRECTORY ||\n- " 
-            for i in range(len(dir_files)):
-                msg += dir_files[i] + ('\n- ' if i != len(dir_files) - 1 else '')
-            msg += "\n----------------------\n"
-            return msg
-        except Exception as e:
-            errorMsg = f"{e}"
-            print("Error:", errorMsg)
-            return errorMsg
-
-    def get_clients(self, params):
-        clients = self.clients.keys()
-        clients.remove(params[1])
-        return clients
-        
-    def message(self, params): 
-        
-        pass
     def message_all(self, params): pass
 
     def get_file(self, params): 
@@ -211,18 +278,14 @@ class Server:
 
             if filename not in dir_files:
                 raise Exception("File not found in the server")
-                print(dir)
-            print(0)
+            
             with open(dir + '\\' + filename, 'rb') as file:
-                print(1)
                 file_data = file.read(1024)
                 while file_data:
-                    print(2)
                     connectionSocket.send(file_data)
                     file_data = file.read(1024)
                 connectionSocket.send(b"<<EOF>>")
                 file.close()
-                print('done sending')
 
             msg = f"File received from Server: {filename}"
             print(msg)
@@ -236,102 +299,4 @@ class Server:
             errorMsg = f"{e}"
             print("Error:", errorMsg)
             return errorMsg
-        
-    
 server = Server()
-#     def __init__(self, host, port):
-#         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-#         self.server_socket.bind((host, port))
-#         self.server_socket.listen()
-
-#         self.clients = {}
-#         self.files = {}
-
-#         # Tkinter GUI setup
-#         self.root = tk.Tk()
-#         self.root.title("File Exchange Server")
-#         self.output_text = scrolledtext.ScrolledText(self.root, width=40, height=20)
-#         self.output_text.pack(padx=10, pady=10)
-
-#     def start_server(self):
-#         print("Server is running...")
-#         threading.Thread(target=self.accept_connections).start()
-#         self.root.mainloop()
-
-#     def accept_connections(self):
-#         while True:
-#             client_socket, client_address = self.server_socket.accept()
-#             threading.Thread(target=self.handle_client, args=(client_socket,)).start()
-
-#     def handle_client(self, client_socket):
-#         try:
-#             handle = client_socket.recv(1024).decode("utf-8")
-#             self.clients[handle] = client_socket
-#             self.display_output(f"User {handle} connected.")
-
-#             while True:
-#                 data = client_socket.recv(1024).decode("utf-8")
-#                 if not data:
-#                     break
-#                 self.process_command(handle, data)
-
-#         except Exception as e:
-#             print(f"Error: {e}")
-
-#     def process_command(self, handle, command):
-#         parts = command.split(" ", 1)
-#         command_name = parts[0].lower()
-
-#         if command_name == "/store":
-#             self.handle_store_command(handle, parts[1])
-#         elif command_name == "/dir":
-#             self.handle_dir_command(handle)
-#         elif command_name == "/get":
-#             self.handle_get_command(handle, parts[1])
-#         else:
-#             self.broadcast_message(handle, f"Error: Command not found: {command}")
-
-#     def handle_store_command(self, handle, filename):
-#         if handle not in self.files:
-#             self.files[handle] = []
-#         self.files[handle].append(filename)
-#         self.broadcast_message(handle, f"{handle} is storing file: {filename}")
-
-#     def handle_dir_command(self, handle):
-#         if handle in self.files:
-#             file_list = "\n".join(self.files[handle])
-#             self.send_message(handle, f"Server Directory\n{file_list}")
-#         else:
-#             self.send_message(handle, "Server Directory: No files available")
-
-#     def handle_get_command(self, handle, filename):
-#         if handle in self.files and filename in self.files[handle]:
-#             self.send_message(handle, f"File received from Server: {filename}")
-#         else:
-#             self.send_message(handle, f"Error: File not found in the server: {filename}")
-
-#     def broadcast_message(self, sender_handle, message):
-#         for h, client_socket in self.clients.items():
-#             if h != sender_handle:
-#                 try:
-#                     client_socket.send(f"{sender_handle}: {message}".encode("utf-8"))
-#                 except Exception as e:
-#                     print(f"Error: {e}")
-
-#     def send_message(self, handle, message):
-#         if handle in self.clients:
-#             client_socket = self.clients[handle]
-#             try:
-#                 client_socket.send(message.encode("utf-8"))
-#             except Exception as e:
-#                 print(f"Error: {e}")
-
-#     def display_output(self, message):
-#         print(message)
-#         self.output_text.insert(tk.END, message + "\n")
-#         self.output_text.see(tk.END)
-
-# if __name__ == "__main__":
-#     server = Server
-#("127.0.0.1", 12345)
-#     server.start_server()
