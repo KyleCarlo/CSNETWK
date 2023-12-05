@@ -1,12 +1,14 @@
 # In server.py
 from socket import *
 import threading
+from datetime import datetime
+import os
 
 class Server:
     def __init__(self):
         self.serverPort = 12345
         self.serverSocket = socket(AF_INET, SOCK_STREAM)
-        self.serverSocket.bind(('', self.serverPort))
+        self.serverSocket.bind(('127.0.0.1', self.serverPort))
         self.serverSocket.listen()
         self.clients = {}
         self.commands = {
@@ -22,13 +24,13 @@ class Server:
             },
             "/store":{
                 "desc": "Send file to server",
-                "usage": "/store <filename>",
-                "call": None
+                "usage": "/store <handle> <filename>",
+                "call": self.store_file
             }, 
             "/dir": {
                 "desc": "Request directory file list from a server",
                 "usage": "/dir",
-                "call": None
+                "call": self.get_dir
             }, 
             "/get":{
                 "desc": "Fetch a file from a server",
@@ -52,6 +54,7 @@ class Server:
 
     def handle_client(self, connectionSocket, addr):
         print(f"[NEW CONNECTION] {addr} connected.")
+
         while True:
             try:
                 data = connectionSocket.recv(1024).decode('utf-8')
@@ -70,12 +73,15 @@ class Server:
                 if args[0] == '/register':
                     args.append(connectionSocket)
                     args.append(addr)
-                
+
+                if args[0] == '/store':
+                    args.append(connectionSocket)
+
                 res = self.commands[args[0]]["call"](args)
                 connectionSocket.send(res.encode('utf-8'))
 
             except Exception as e:
-                print(f"[ERROR] {str(e)}")
+                print(f"Error: {str(e)}")
                 break
 
     def register_handle(self, params):
@@ -98,6 +104,56 @@ class Server:
             errorMsg = f"{e}"
             print("Error:", errorMsg)
             return errorMsg
+
+    def store_file(self, params):
+        try:
+            connectionSocket = params[3]
+            filename = 'server_files/' + params[2]
+            if not os.path.exists('server_files/'):
+                os.makedirs('server_files/')
+            
+            if os.path.exists(filename):
+                i = 1
+                actual_file = filename.split('.')
+                filename = ''
+                if isinstance(actual_file, list):
+                    for i in range(len(actual_file) - 2):
+                        filename += actual_file[i]
+                        if i != len(actual_file) - 3:
+                            filename += '.'
+                    while os.path.exists(f'{actual_file[0]} ({i}).{actual_file[1]}'):
+                        i += 1
+                    filename = f'{actual_file[0]} ({i}).{actual_file[1]}'
+                else:
+                    filename = actual_file
+                    while os.path.exists(f'{filename} ({i})'):
+                        i += 1
+                    filename = f'{filename} ({i})'
+            
+            with open(filename, 'wb') as file:
+                while True:
+                    data = connectionSocket.recv(1024)
+                    if b"<<EOF>>" in data:
+                        print("reading complete")
+                        break
+                    file.write(data)                
+                file.close()
+            filename = filename.split('/')
+            filename = filename[len(filename) - 1]
+
+            msg = f"{params[1]} <{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}>: Uploaded {filename}"
+            print(msg)
+            return msg
+        except Exception as e:
+            errorMsg = f"{e}"
+            print("Error:", errorMsg)
+            return errorMsg
+
+    def get_dir(self, params):
+        list_dir = os.listdir('/')
+        print(list_dir)
+        # print("LIST DIR\n", os.listdir())
+        return list_dir
 
 server = Server()
 #     def __init__(self, host, port):

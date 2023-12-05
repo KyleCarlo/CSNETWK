@@ -3,8 +3,7 @@ import socket
 import threading
 import tkinter as tk
 from tkinter import scrolledtext, Entry, Button, simpledialog  # Added simpledialog
-import time
-
+import os
 class Client:
     # def __init__(self):
     #     # Tkinter GUI setup
@@ -293,31 +292,83 @@ class Client:
             return errorMsg
 
 
-    def send_file_to_server(self, filename):
+    def send_file_to_server(self, params):
         try:
-            with open(filename, "rb") as file:
-                file_data = file.read()
-                file_size = len(file_data)
+            if len(params) != 2:
+                raise Exception("Command parameters do not match or are not allowed.")
+            if self.socket is None:
+                raise Exception("Cannot send file. Please connect to the server first.")
+            if self.handle is None:
+                raise Exception("Cannot send file. Please register first.")
+            
+            filename = params[1]
 
-                # Send the command to the server
-                self.send_message(f"/store {filename} {file_size}")
+            if not os.path.exists(filename):
+                raise Exception("File not found.")
+            
+            self.socket.send(f"/store {self.handle} {filename}".encode('utf-8'))
+            
+            with open(filename, 'rb') as file:
+                file_data = file.read(1024)
+                while file_data:
+                    self.socket.send(file_data)
+                    file_data = file.read(1024)
+                self.socket.send(b'<<EOF>>')
+            file.close()
 
-                # Receive the server's acknowledgment
-                acknowledgment = self.server_socket.recv(1024).decode("utf-8")
+            # Receive the server's response
+            res = self.socket.recv(1024).decode('utf-8')
 
-                if acknowledgment.startswith("Ready to receive"):
-                    # Send the file data to the server
-                    self.server_socket.sendall(file_data)
+            if "Uploaded" in res:
+                print(res)
+                return res
+            else:
+                raise Exception(res)
+            
+# with open(filename, 'rb') as file:
+    
+#     # self.client_socket.send(f"/store {filename}".encode('utf-8'))  # Start of file transmission
 
-                    # Display success message with timestamp
-                    timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-                    self.display_output(f"{self.handle}<{timestamp}>: Uploaded {filename}")
-                else:
-                    self.display_output(f"Server rejected the file: {acknowledgment}")
-        except FileNotFoundError:
-            self.display_output(f"Error: File '{filename}' not found.")
+#     file_data = file.read(1024)
+#     while file_data:
+#         self.client_socket.send(file_data)
+#         file_data = file.read(1024)
+
+#     # Add an end-of-file marker
+#     self.client_socket.send(b'<<EOF>>')
+
+        except IOError:
+            errorMsg = "Error: File not found."
+            print(errorMsg)
+            return errorMsg
         except Exception as e:
-            self.display_output(f"Error: {e}")
+            errorMsg = f"Error: {e}"
+            print(errorMsg)
+            return errorMsg
+        # try:
+        #     with open(filename, "rb") as file:
+        #         file_data = file.read()
+        #         file_size = len(file_data)
+
+        #         # Send the command to the server
+        #         self.send_message(f"/store {filename}")
+
+        #         # Receive the server's acknowledgment
+        #         acknowledgment = self.server_socket.recv(1024).decode("utf-8")
+
+        #         if acknowledgment.startswith("Ready to receive"):
+        #             # Send the file data to the server
+        #             self.server_socket.sendall(file_data)
+
+        #             # Display success message with timestamp
+        #             timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+        #             self.display_output(f"{self.handle}<{timestamp}>: Uploaded {filename}")
+        #         else:
+        #             self.display_output(f"Server rejected the file: {acknowledgment}")
+        # except FileNotFoundError:
+        #     self.display_output(f"Error: File '{filename}' not found.")
+        # except Exception as e:
+        #     self.display_output(f"Error: {e}")
 
 
     def request_directory_list(self, params):
