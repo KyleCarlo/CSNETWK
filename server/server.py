@@ -92,6 +92,7 @@ class Server:
                     args.append(connectionSocket)
 
                 res = self.commands[args[0]]["call"](args)
+                
                 connectionSocket.send(res.encode('utf-8'))
 
             except Exception as e:
@@ -125,8 +126,6 @@ class Server:
             filename = params[2]
             dir = os.path.dirname(os.path.abspath(__file__))
             dir_files = os.listdir(dir)
-            print("dir", dir)
-            print("files", dir_files)
 
             if 'server_files' not in dir_files:
                 os.mkdir(dir + '/server_files')
@@ -144,26 +143,23 @@ class Server:
                         if j != len(actual_file) - 2:
                             filename += '.'
 
-                    while (f'{filename} ({i}).{actual_file[-1]}') in dir_files:
+                    while (f'{filename}-{i}.{actual_file[-1]}') in dir_files:
                         i += 1
-                    filename = f'{filename} ({i}).{actual_file[-1]}'
+                    filename = f'{filename}-{i}.{actual_file[-1]}'
                 else:
                     filename = actual_file
-                    while (f'{filename} ({i})') in dir_files:
+                    while (f'{filename}-{i}') in dir_files:
                         i += 1
-                    filename = f'{filename} ({i})'
+                    filename = f'{filename}-{i}'
             
-            filename = dir + '\\server_files\\' + filename
-            
-            with open(filename, 'wb') as file:
+            with open(dir + '\\server_files\\' + filename, 'wb') as file:
                 while True:
                     data = connectionSocket.recv(1024)
                     if b"<<EOF>>" in data:
+                        file.write(data[:-7])
                         break
                     file.write(data)                
                 file.close()
-            filename = filename.split('/')
-            filename = filename[len(filename) - 1]
 
             msg = f"{params[1]} <{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}>: Uploaded {filename}"
             print(msg)
@@ -174,9 +170,18 @@ class Server:
             return errorMsg
 
     def get_dir(self, params):
-        dir = os.path.dirname(os.path.abspath(__file__))
-        dir_files = os.listdir(dir)
-        return str(dir_files)
+        try:
+            dir = os.path.dirname(os.path.abspath(__file__)) + '\\server_files'
+            dir_files = os.listdir(dir)
+            msg = "----------------------\n|| SERVER DIRECTORY ||\n- " 
+            for i in range(len(dir_files)):
+                msg += dir_files[i] + ('\n- ' if i != len(dir_files) - 1 else '')
+            msg += "\n----------------------\n"
+            return msg
+        except Exception as e:
+            errorMsg = f"{e}"
+            print("Error:", errorMsg)
+            return errorMsg
 
     def get_clients(self, params):
         clients = self.clients.keys()
@@ -198,18 +203,39 @@ class Server:
             if 'server_files' not in dir_files:
                 raise Exception("No files in the server")
             
-            dir_files = os.listdir(dir + '\\server_files')
+            dir += '\\server_files'
+            dir_files = os.listdir(dir)
+            print(dir_files)
+            print(dir)
+            print(filename)
 
             if filename not in dir_files:
                 raise Exception("File not found in the server")
-            
-            with open(dir_files + filename, 'rb') as file:
+                print(dir)
+            print(0)
+            with open(dir + '\\' + filename, 'rb') as file:
+                print(1)
                 file_data = file.read(1024)
                 while file_data:
-                    connectionSocket.send
+                    print(2)
+                    connectionSocket.send(file_data)
+                    file_data = file.read(1024)
+                connectionSocket.send(b"<<EOF>>")
+                file.close()
+                print('done sending')
+
+            msg = f"File received from Server: {filename}"
+            print(msg)
+            return msg
                 
+        except IOError:
+            errorMsg = "Error: IO ERROr."
+            print(errorMsg)
+            return errorMsg
         except Exception as e:
-            pass
+            errorMsg = f"{e}"
+            print("Error:", errorMsg)
+            return errorMsg
         
     
 server = Server()

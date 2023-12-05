@@ -197,7 +197,7 @@ class Client:
                     self.socket.send(file_data)
                     file_data = file.read(1024)
                 self.socket.send(b'<<EOF>>')
-            file.close()
+                file.close()
 
             # Receive the server's response
             res = self.socket.recv(1024).decode('utf-8')
@@ -242,8 +242,11 @@ class Client:
                 raise Exception("Command parameters do not match or are not allowed.")
             if self.socket is None:
                 raise Exception("Cannot check file directory. Please connect to the server first.")
-            print("Requesting directory list from server...")
+            if self.handle is None:
+                raise Exception("Cannot check file directory. Please register to the server first.")
             self.socket.send(("/dir").encode('utf-8'))
+            res = self.socket.recv(1024).decode('utf-8')
+            return res
         except Exception as e:
             errorMsg = f"Error: {e}"
             print(errorMsg)
@@ -261,17 +264,58 @@ class Client:
             filename = params[1]
 
             self.socket.send(f"/get {filename}".encode('utf-8'))
+
+            dir = os.path.dirname(os.path.abspath(__file__))
+            dir_files = os.listdir(dir)
+            
+            if filename in dir_files:
+                i = 1
+                actual_file = filename.split('.')
+
+                if isinstance(actual_file, list):
+                    filename = ''
+                    for j in range(len(actual_file) - 1):
+                        filename += actual_file[j]
+                        if j != len(actual_file) - 2:
+                            filename += '.'
+
+                    while (f'{filename}-{i}.{actual_file[-1]}') in dir_files:
+                        i += 1
+                    filename = f'{filename}-{i}.{actual_file[-1]}'
+                else:
+                    filename = actual_file
+                    while (f'{filename}-{i}') in dir_files:
+                        i += 1
+                    filename = f'{filename}-{i}'
+            
+            with open(filename, 'wb') as file:
+                while True:
+                    file_data = self.socket.recv(1024)
+                    if b'<<EOF>>' in file_data:
+                        break
+                    file.write(file_data)
+                print('done reading')
+                file.close()
+            
+            res = self.socket.recv(1024).decode('utf-8')
+
+            if "File received from Server: " in res:
+                print(f"File received from Server: {filename}")
+                return f"File received from Server: {filename}"
+            else:
+                raise Exception(res)
+        
         except Exception as e:
             errorMsg = f"Error: {e}"
             print(errorMsg)
             return errorMsg
-        self.send_message(f"/get {filename}")
 
     def show_commands(self, params):
         msg = "Commands:\n-----------------------\n"
         for command in self.commands:
             msg += f"{self.commands[command]['usage']} - {self.commands[command]['desc']}\n"
-        self.output_text.insert(tk.END, f"{msg}\n")
+        print(msg)
+        return msg
 
     def send_message(self, message):
         try:
