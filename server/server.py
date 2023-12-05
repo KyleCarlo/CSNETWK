@@ -35,7 +35,12 @@ class Server:
             "/get":{
                 "desc": "Fetch a file from a server",
                 "usage": "/get <filename>",
-                "call": None
+                "call": self.get_file
+            },
+            "/clients": {
+                "desc": "Get the list of clients connected to the server",
+                "usage": "/getclients",
+                "call": self.get_clients
             },
             "/msg": {
                 "desc": "Message another client connected to the server",
@@ -46,7 +51,7 @@ class Server:
                 "desc": "Message clients connected to the server",
                 "usage": "/msgall <message>",
                 "call": self.message_all
-            },
+            }
         }
 
         while True:
@@ -64,7 +69,6 @@ class Server:
 
     def handle_client(self, connectionSocket, addr):
         print(f"[NEW CONNECTION] {addr} connected.")
-
         while True:
             try:
                 data = connectionSocket.recv(1024).decode('utf-8')
@@ -84,7 +88,7 @@ class Server:
                     args.append(connectionSocket)
                     args.append(addr)
 
-                if args[0] == '/store':
+                if args[0] == '/store' or args[0] == '/get':
                     args.append(connectionSocket)
 
                 res = self.commands[args[0]]["call"](args)
@@ -170,12 +174,43 @@ class Server:
             return errorMsg
 
     def get_dir(self, params):
-        list_dir = os.listdir(os.getcwd() + '/server_files')
-        print(list_dir)
-        return list_dir
+        dir = os.path.dirname(os.path.abspath(__file__))
+        dir_files = os.listdir(dir)
+        return str(dir_files)
 
-    def message(self, params): pass
+    def get_clients(self, params):
+        clients = self.clients.keys()
+        clients.remove(params[1])
+        return clients
+        
+    def message(self, params): 
+        
+        pass
     def message_all(self, params): pass
+
+    def get_file(self, params): 
+        try:
+            connectionSocket = params[2]
+            filename = params[1]
+            dir = os.path.dirname(os.path.abspath(__file__))
+            dir_files = os.listdir(dir)
+
+            if 'server_files' not in dir_files:
+                raise Exception("No files in the server")
+            
+            dir_files = os.listdir(dir + '\\server_files')
+
+            if filename not in dir_files:
+                raise Exception("File not found in the server")
+            
+            with open(dir_files + filename, 'rb') as file:
+                file_data = file.read(1024)
+                while file_data:
+                    connectionSocket.send
+                
+        except Exception as e:
+            pass
+        
     
 server = Server()
 #     def __init__(self, host, port):
