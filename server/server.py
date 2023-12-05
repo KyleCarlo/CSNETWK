@@ -230,6 +230,59 @@ class Server:
             print("Error:", errorMsg)
             return errorMsg
     
+    # Method for a client to download a file from the server
+    def get_file(self, params): 
+        try:
+            # Save client socket and filename as variables for later
+            connectionSocket = params[2]
+            filename = params[1]
+           
+            # Get the current directory and files inside
+            dir = os.path.dirname(os.path.abspath(__file__))
+            dir_files = os.listdir(dir)
+
+            # Check if the 'server_files' folder exists
+            if 'server_files' not in dir_files:
+                raise Exception("No files in the server")
+            
+            # Change directory to be inside 'server_files' folder
+            dir += '\\server_files'
+            dir_files = os.listdir(dir)
+
+            # Check if file is in the 'server_files' folder
+            if filename not in dir_files:
+                raise Exception("File not found in the server")
+            
+            # Open the file for reading
+            with open(dir + '\\' + filename, 'rb') as file:
+                # Read the initial 1024 bits
+                file_data = file.read(1024)
+                while file_data:
+                    # Send the chunks to the socket and continue reading
+                    connectionSocket.send(file_data)
+                    file_data = file.read(1024)
+                # Send the EOF tag to the socket
+                connectionSocket.send(b"<<EOF>>")
+                # Close the file
+                file.close()
+
+            # Return a response indicating successful download from server
+            msg = f"File received from Server: {filename}"
+            print(msg)
+            return msg
+                
+        except IOError:
+            # Catch any IO Errors
+            errorMsg = "Error: IO Error."
+            print(errorMsg)
+            return errorMsg
+        except Exception as e:
+            # Print other Errors
+            errorMsg = f"{e}"
+            print("Error:", errorMsg)
+            return errorMsg
+    
+    # Methods for Bonus Requirements
     # Method to get the list of other clients
     def get_clients(self, params):
         # Get the list of clients
@@ -239,7 +292,7 @@ class Server:
         # Return list of other clients, indicating successful retrieval
         return clients
     
-    # 
+    # Method to allow client to message another client through unicast
     def message(self, params): 
         try:
             source_name = params[1]
@@ -260,43 +313,5 @@ class Server:
 
     def message_all(self, params): pass
 
-    def get_file(self, params): 
-        try:
-            connectionSocket = params[2]
-            filename = params[1]
-            dir = os.path.dirname(os.path.abspath(__file__))
-            dir_files = os.listdir(dir)
-
-            if 'server_files' not in dir_files:
-                raise Exception("No files in the server")
-            
-            dir += '\\server_files'
-            dir_files = os.listdir(dir)
-            print(dir_files)
-            print(dir)
-            print(filename)
-
-            if filename not in dir_files:
-                raise Exception("File not found in the server")
-            
-            with open(dir + '\\' + filename, 'rb') as file:
-                file_data = file.read(1024)
-                while file_data:
-                    connectionSocket.send(file_data)
-                    file_data = file.read(1024)
-                connectionSocket.send(b"<<EOF>>")
-                file.close()
-
-            msg = f"File received from Server: {filename}"
-            print(msg)
-            return msg
-                
-        except IOError:
-            errorMsg = "Error: IO ERROr."
-            print(errorMsg)
-            return errorMsg
-        except Exception as e:
-            errorMsg = f"{e}"
-            print("Error:", errorMsg)
-            return errorMsg
+    
 server = Server()
