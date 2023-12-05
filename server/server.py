@@ -66,9 +66,10 @@ class Server:
             
             try:
                 # Accept an incoming connection
-                connectionSocket, addr = self.serverSocket.accept()
+                consoleSocket, addr = self.serverSocket.accept()
+                messageSocket, _ = self.serverSocket.accept()
                 # Create a thread to handle the client
-                thread = threading.Thread(target=self.handle_client, args=(connectionSocket, addr))
+                thread = threading.Thread(target=self.handle_client, args=(consoleSocket, messageSocket, addr))
                 thread.start()
                 # Display number of active connections
                 print(f"[ACTIVE CONNECTIONS] {threading.active_count() - 1}")
@@ -78,7 +79,7 @@ class Server:
                 print("Error: Multithreading Error...")
 
     # Method to handle client connections
-    def handle_client(self, connectionSocket, addr):
+    def handle_client(self, connectionSocket, secondSocket, addr):
         print(f"[NEW CONNECTION] {addr} connected.")
         while True:
             try:
@@ -100,6 +101,7 @@ class Server:
                 # If /register, append the client socket and address for later
                 if args[0] == '/register':
                     args.append(connectionSocket)
+                    args.append(secondSocket)
                     args.append(addr)
 
                 # If /store or /get, append the client socket for later
@@ -125,7 +127,7 @@ class Server:
             if params[1] in self.clients.keys():
                 raise Exception("Registration failed. Handle or alias already exists.")
             # Saving the client to the dictionary of clients
-            self.clients[params[1]] = {"socket" : params[2], "address" : params[3]}
+            self.clients[params[1]] = {"socket" : params[2], "message_socket" : params[3], "address" : params[4]}
             # Return a response to indicate successful registration
             return f"Welcome {params[1]}!"
         except Exception as e:
@@ -286,9 +288,10 @@ class Server:
     # Method to get the list of other clients
     def get_clients(self, params):
         # Get the list of clients
-        clients = self.clients.keys()
+        clients = list(self.clients.keys())
         # Remove requesting client from list
-        clients.remove(params[1])
+        if params[1] in clients:
+            clients.remove(params[1])
         # Return list of other clients, indicating successful retrieval
         return clients
     
@@ -298,12 +301,15 @@ class Server:
             source_name = params[1]
             dest_name = params[2]
             msg = params[3]
+
             if dest_name not in self.clients.keys():
-                raise Exception("Client not found in the server")
-            dest_socket = self.clients[dest_name]["socket"]
+                raise Exception("Client not found in the server.")
+            if source_name == dest_name:
+                raise Exception("Cannot message yourself.")
+            dest_socket = self.clients[dest_name]["message_socket"]
             dest_socket.send(f"{source_name}: {msg}".encode('utf-8'))
 
-            msg = "Message sent."
+            msg = f"Message sent to {dest_name}."
             print(msg)
             return msg
         except Exception as e:

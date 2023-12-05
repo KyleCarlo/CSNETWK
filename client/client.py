@@ -7,8 +7,8 @@ import threading
 class Client:
     def __init__(self):
         self.handle = None
-        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket = None
+        self.message_socket = None
         self.recv_message = True
         self.commands = {
             "/join": {
@@ -75,7 +75,6 @@ class Client:
 
     # sends user input to the server
     def send_user_input(self):
-        
         command = self.input_entry.get()
         
         try:
@@ -117,12 +116,14 @@ class Client:
             server_host = params[1]
             server_port = int(params[2])
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.message_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         
             self.socket.connect((server_host, server_port))
+            self.message_socket.connect((server_host, server_port))
             msg = "Connection to the File Exchange Server is successful!"
             print(msg)
             return msg
-        except ConnectionError as ce:
+        except ConnectionError:
             self.socket = None
             msg = f"Error: Connection to the Server has failed! Please check IP Address and Port Number."
             print(msg)
@@ -142,6 +143,7 @@ class Client:
             res = self.socket.recv(1024).decode('utf-8')
             if res == "Connection closed. Thank you!":
                 self.socket.close()
+                self.message_socket.close()
                 self.socket = None
                 return res
             else: 
@@ -160,12 +162,14 @@ class Client:
             user_handle = params[1]
             if self.socket is None:
                 raise Exception("Registration failed. Please connect to the server first.")
+            
             self.socket.send(f'/register {user_handle}'.encode('utf-8'))
             # Receive the server's response
             res = self.socket.recv(1024).decode('utf-8')
             
             if res == f"Welcome {user_handle}!":
                 self.handle = user_handle
+                threading.Thread(target=self.receive).start()
                 return res
             else:
                 raise Exception(res)
@@ -233,10 +237,6 @@ class Client:
             return errorMsg
 
     def message(self, params):
-        # params[0] = /msg
-        # params[1] = client_name
-        # params[2] = destination_client_name
-        # params[3] = message
         try:
             if len(params) != 3:
                 raise Exception("Command parameters do not match or are not allowed.")
@@ -251,7 +251,7 @@ class Client:
             self.socket.send(f"/msg {self.handle} {destination_client_name} {message}".encode('utf-8'))
             res = self.socket.recv(1024).decode('utf-8')
 
-            if res == "Message sent.":
+            if "Message sent" in res:
                 print(res)
                 return res
             else:
@@ -262,7 +262,11 @@ class Client:
             return errorMsg
 
     def receive(self):
-        pass
+        while True:
+            message = self.message_socket.recv(1024).decode('utf-8')
+            self.output_text.insert(tk.END, f"{message}\n")
+            print(message)
+
         
     def message_all(self, params):
         pass
