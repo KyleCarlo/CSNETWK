@@ -92,7 +92,6 @@ class Client:
         try:
             # Check if the command is valid and separate the command arguments
             isValid, args = self.check_command(command)
-
             # If the command is valid, call the method associated with the command
             if isValid: 
                 res = self.commands[args[0]]["call"](args) # Call the command's method
@@ -164,13 +163,12 @@ class Client:
             return msg
         
         except ConnectionResetError:
-            # Print error
+            # Check if connection to server has been reset
             errorMsg = f"Error: Connection to the Server has been reset."
             print(errorMsg)
             self.output_text.configure(state='normal')
             self.output_text.insert(tk.END, f"{errorMsg}\n")
             self.output_text.configure(state='disabled')
-
         except ConnectionError:
             # Check for possible connection errors
             # Set the sockets to None for safety
@@ -235,7 +233,7 @@ class Client:
             # Check that there are exactly 2 parameters
             if len(params) != 2:
                 raise Exception("Command parameters do not match or are not allowed.")
-            # Check that the client is already registered
+            # Check that the client is not yet registered
             if self.handle is not None:
                 raise Exception("Already registered.")
             # Check that there is an existing socket
@@ -246,10 +244,8 @@ class Client:
             user_handle = params[1]
             # Send the register command to the server
             self.socket.send(f'/register {user_handle}'.encode('utf-8'))
-
             # Receive the server's response
             res = self.socket.recv(1024).decode('utf-8')
-            
             # Check if the server has successfully registered the handle
             if res == f"Welcome {user_handle}!":
                 self.handle = user_handle
@@ -268,7 +264,6 @@ class Client:
             msg = f"Error: Connection to the Server has failed! Please check IP Address and Port Number."
             print(msg)
             return msg
-            
         except Exception as e:
             # Print error
             errorMsg = f"Error: {e}"
@@ -333,7 +328,6 @@ class Client:
             msg = f"Error: Connection to the Server has failed! Please check IP Address and Port Number."
             print(msg)
             return msg
-
         except IOError:
             # Catch any IO errors
             errorMsg = "Error: File not found."
@@ -423,7 +417,7 @@ class Client:
                     while (f'{filename}-{i}') in dir_files:
                         i += 1
                     filename = f'{filename}-{i}'
-
+            # Tells the client it is ok to receive
             proceed = self.socket.recv(1024).decode('utf-8')
             if proceed != "Proceed to receive.":
                 raise Exception(proceed)
