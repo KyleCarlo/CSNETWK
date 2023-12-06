@@ -4,7 +4,7 @@
 # Import libraries
 import socket
 import tkinter as tk
-from tkinter import scrolledtext, Entry, Button, simpledialog  # Added simpledialog
+from tkinter import scrolledtext, Entry, Button
 import os
 import threading
 class Client:
@@ -107,7 +107,7 @@ class Client:
                     self.input_entry.delete(0, tk.END)
             else: 
                 raise Exception("Command not found.")
-        
+
         except Exception as e:
             # Print error
             errorMsg = f"Error: {e}"
@@ -162,6 +162,15 @@ class Client:
             msg = "Connection to the File Exchange Server is successful!"
             print(msg)
             return msg
+        
+        except ConnectionResetError:
+            # Print error
+            errorMsg = f"Error: Connection to the Server has been reset."
+            print(errorMsg)
+            self.output_text.configure(state='normal')
+            self.output_text.insert(tk.END, f"{errorMsg}\n")
+            self.output_text.configure(state='disabled')
+
         except ConnectionError:
             # Check for possible connection errors
             # Set the sockets to None for safety
@@ -203,6 +212,17 @@ class Client:
                 return res
             else: 
                 raise Exception("Error: Disconnection failed.")
+            
+        except ConnectionError:
+            # Check for possible connection errors
+            # Set the sockets to None for safety
+            self.socket = None
+            self.message_socket = None
+            # Print error
+            msg = f"Error: Connection to the Server has failed! Please check IP Address and Port Number."
+            print(msg)
+            return msg
+        
         except Exception as e:
             # Print error
             errorMsg = f"Error: {e}"
@@ -238,6 +258,16 @@ class Client:
                 return res
             else:
                 raise Exception(res)
+            
+        except ConnectionError:
+            # Check for possible connection errors
+            # Set the sockets to None for safety
+            self.socket = None
+            self.message_socket = None
+            # Print error
+            msg = f"Error: Connection to the Server has failed! Please check IP Address and Port Number."
+            print(msg)
+            return msg
             
         except Exception as e:
             # Print error
@@ -293,6 +323,16 @@ class Client:
                 return res
             else:
                 raise Exception(res)
+            
+        except ConnectionError:
+            # Check for possible connection errors
+            # Set the sockets to None for safety
+            self.socket = None
+            self.message_socket = None
+            # Print error
+            msg = f"Error: Connection to the Server has failed! Please check IP Address and Port Number."
+            print(msg)
+            return msg
 
         except IOError:
             # Catch any IO errors
@@ -327,6 +367,15 @@ class Client:
                 return res
             else:
                 raise Exception(res)
+        except ConnectionError:
+            # Check for possible connection errors
+            # Set the sockets to None for safety
+            self.socket = None
+            self.message_socket = None
+            # Print error
+            msg = f"Error: Connection to the Server has failed! Please check IP Address and Port Number."
+            print(msg)
+            return msg
         except Exception as e:
             # Print error
             errorMsg = f"Error: {e}"
@@ -344,7 +393,7 @@ class Client:
                 raise Exception("Cannot fetch file. Please connect to the server first.")
             # Check that the client is already registeref
             if self.handle is None:
-                raise Exception("Cannot send file. Please register first.")
+                raise Exception("Cannot fetch file. Please register first.")
             
             # Save the filename
             filename = params[1]
@@ -374,9 +423,13 @@ class Client:
                     while (f'{filename}-{i}') in dir_files:
                         i += 1
                     filename = f'{filename}-{i}'
+
+            proceed = self.socket.recv(1024).decode('utf-8')
+            if proceed != "Proceed to receive.":
+                raise Exception(proceed)
             
             # Writing the file data to the newly created file
-            with open(filename, 'wb') as file:
+            with open(dir + '\\' + filename, 'wb') as file:
                 while True:
                     # Get 1024 bits of data at a time
                     file_data = self.socket.recv(1024)
@@ -397,7 +450,15 @@ class Client:
                 return f"File received from Server: {filename}"
             else:
                 raise Exception(res)
-        
+        except ConnectionError:
+            # Check for possible connection errors
+            # Set the sockets to None for safety
+            self.socket = None
+            self.message_socket = None
+            # Print error
+            msg = f"Error: Connection to the Server has failed! Please check IP Address and Port Number."
+            print(msg)
+            return msg
         except Exception as e:
             # Print error
             errorMsg = f"Error: {e}"
@@ -443,6 +504,16 @@ class Client:
                 return res
             else:
                 raise Exception(res)
+            
+        except ConnectionError:
+            # Check for possible connection errors
+            # Set the sockets to None for safety
+            self.socket = None
+            self.message_socket = None
+            # Print error
+            msg = f"Error: Connection to the Server has failed! Please check IP Address and Port Number."
+            print(msg)
+            return msg
         except Exception as e:
             # Print error
             errorMsg = f"Error: {e}"
@@ -475,6 +546,15 @@ class Client:
                 return res
             else:
                 raise Exception(res)
+        except ConnectionError:
+            # Check for possible connection errors
+            # Set the sockets to None for safety
+            self.socket = None
+            self.message_socket = None
+            # Print error
+            msg = f"Error: Connection to the Server has failed! Please check IP Address and Port Number."
+            print(msg)
+            return msg
         except Exception as e:
             # Print error
             errorMsg = f"Error: {e}"
@@ -484,18 +564,28 @@ class Client:
     # Method for the client to receive messages
     def receive(self):
         # Continuously receive messages from the server
-        while True:
-            message = self.message_socket.recv(1024).decode('utf-8')
+        try:
+            while True:
+                message = self.message_socket.recv(1024).decode('utf-8')
 
-            if ":" not in message:
-                message = "[DISCONNECTED]."
+                if ":" not in message:
+                    message = "[DISCONNECTED]."
+                    print(message)
+                    break
+                # Display the message to the GUI's console
+                self.chat_room.configure(state='normal')
+                self.chat_room.insert(tk.END, f"{message}\n")
+                self.chat_room.configure(state='disabled')
                 print(message)
-                break
-            # Display the message to the GUI's console
-            self.chat_room.configure(state='normal')
-            self.chat_room.insert(tk.END, f"{message}\n")
-            self.chat_room.configure(state='disabled')
-            print(message)
+        except ConnectionError:
+            # Check for possible connection errors
+            # Set the sockets to None for safety
+            self.socket = None
+            self.message_socket = None
+            # Print error
+            msg = f"Error: Connection to the Server has failed! Please check IP Address and Port Number."
+            print(msg)
+            return msg
 
 # Main method
 if __name__ == "__main__":

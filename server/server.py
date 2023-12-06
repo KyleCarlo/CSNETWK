@@ -218,7 +218,7 @@ class Server:
             dir_files = os.listdir(dir)
             
             # Preparing the message to be returned as response
-            msg = "----------------------\n|| SERVER DIRECTORY ||\n" 
+            msg = "----------------------\n|| SERVER DIRECTORY ||\n- " 
             # Iterating through the files and adding the filenames to the response
             for i in range(len(dir_files)):
                 msg += dir_files[i] + ('\n- ' if i != len(dir_files) - 1 else '')
@@ -248,11 +248,15 @@ class Server:
             
             # Change directory to be inside 'server_files' folder
             dir += '\\server_files'
+            print("GET DIR", dir)
             dir_files = os.listdir(dir)
+            print('DIR FILES', dir_files)
 
             # Check if file is in the 'server_files' folder
             if filename not in dir_files:
                 raise Exception("File not found in the server")
+
+            connectionSocket.send('Proceed to receive.'.encode('utf-8'))
             
             # Open the file for reading
             with open(dir + '\\' + filename, 'rb') as file:
