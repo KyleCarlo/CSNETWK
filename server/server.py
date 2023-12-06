@@ -248,9 +248,7 @@ class Server:
             
             # Change directory to be inside 'server_files' folder
             dir += '\\server_files'
-            print("GET DIR", dir)
             dir_files = os.listdir(dir)
-            print('DIR FILES', dir_files)
 
             # Check if file is in the 'server_files' folder
             if filename not in dir_files:
