@@ -1,11 +1,14 @@
-# In server.py
+"""
+    Server Class and Methods
+"""
+# Import libraries
 from socket import *
 import threading
 from datetime import datetime
 import os
 
 class Server:
-    # Initializing the server 
+    # Initialize the server 
     def __init__(self):
         # Set port to 12345
         self.serverPort = 12345
@@ -16,7 +19,7 @@ class Server:
         self.serverSocket.listen()
         # Initialize a dictionary to store clients
         self.clients = {} # key: handle, values: (socket, address)
-        # Define the list of commands with description, usage, and method to call
+        # Define the dictionary of commands with description, usage, and method to call
         self.commands = {
             "/leave": {
                 "desc": "Disconnect from the server application",
@@ -43,19 +46,14 @@ class Server:
                 "usage": "/get <filename>",
                 "call": self.get_file
             },
-            "/clients": {
-                "desc": "Get the list of clients connected to the server",
-                "usage": "/getclients",
-                "call": self.get_clients
-            },
-            "/msg": {
+            "/pm": {
                 "desc": "Message another client connected to the server",
-                "usage": "/message <client_name> <message>",
+                "usage": "/pm <client_name> <message>",
                 "call": self.message
             },
-            "/msgall": {
+            "/all": {
                 "desc": "Message clients connected to the server",
-                "usage": "/msgall <message>",
+                "usage": "/all <message>",
                 "call": self.message_all
             }
         }
@@ -74,9 +72,9 @@ class Server:
                 # Display number of active connections
                 print(f"[ACTIVE CONNECTIONS] {threading.active_count() - 1}")
             
-            except IOError:
-                # TODO:IDK WHAT TO DO HERE
-                print("Error: Multithreading Error...")
+            except IOError as e:
+                # Catch IO Errors
+                print(f"Error: {e}")
 
     # Method to handle client connections
     def handle_client(self, connectionSocket, secondSocket, addr):
@@ -85,9 +83,8 @@ class Server:
             try:
                 # Receive data from the client
                 data = connectionSocket.recv(1024).decode('utf-8')
-                
+                # Disconnect if empty string is received
                 if not data:
-                    # Empty string received, client disconnected
                     print(f"[DISCONNECTED] {addr} disconnected.")
                     break
 
@@ -116,7 +113,7 @@ class Server:
                 connectionSocket.send(res.encode('utf-8'))
 
             except Exception as e:
-                # Print the error
+                # Print error
                 print(f"Error: {str(e)}")
                 break
     
@@ -131,7 +128,7 @@ class Server:
             # Return a response to indicate successful registration
             return f"Welcome {params[1]}!"
         except Exception as e:
-            # Print the error
+            # Print error
             errorMsg = f"{e}"
             print("Error:", errorMsg)
             return errorMsg
@@ -142,10 +139,10 @@ class Server:
             # Delete the client from the list of clients if registered
             if params[1] is not None and params[1] in self.clients.keys():
                 del self.clients[params[1]]
-            # Return a response to indicate succesful disconnection
+            # Return a response to indicate successful disconnection
             return "Connection closed. Thank you!"
         except Exception as e:
-            # Print the error
+            # Print error
             errorMsg = f"{e}"
             print("Error:", errorMsg)
             return errorMsg
@@ -171,7 +168,7 @@ class Server:
             if filename in dir_files:
                 i = 1
                 actual_file = filename.split('.')
-
+                # Add a number to the end of the filename
                 if isinstance(actual_file, list):
                     filename = ''
                     for j in range(len(actual_file) - 1):
@@ -199,17 +196,19 @@ class Server:
                         break
                     # Write to the file
                     file.write(data)                
+                # Close the file
                 file.close()
 
-            # Return a response indicating succesful storage of file in server
+            # Return a response indicating successful storage of file in server
             msg = f"{params[1]} <{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}>: Uploaded {filename}"
             print(msg)
             return msg
         except Exception as e:
-            # Print the error
+            # Print error
             errorMsg = f"{e}"
             print("Error:", errorMsg)
             return errorMsg
+    
     # Method to get the directory of files stored in the server
     def get_dir(self, params):
         try:
@@ -219,7 +218,7 @@ class Server:
             dir_files = os.listdir(dir)
             
             # Preparing the message to be returned as response
-            msg = "----------------------\n|| SERVER DIRECTORY ||\n- " 
+            msg = "----------------------\n|| SERVER DIRECTORY ||\n" 
             # Iterating through the files and adding the filenames to the response
             for i in range(len(dir_files)):
                 msg += dir_files[i] + ('\n- ' if i != len(dir_files) - 1 else '')
@@ -227,7 +226,7 @@ class Server:
             # Return the response containing the files and indicating successful directory getting
             return msg
         except Exception as e:
-            # Print the error
+            # Print error
             errorMsg = f"{e}"
             print("Error:", errorMsg)
             return errorMsg
@@ -274,7 +273,7 @@ class Server:
             return msg
                 
         except IOError:
-            # Catch any IO Errors
+            # Catch any IO errors
             errorMsg = "Error: IO Error."
             print(errorMsg)
             return errorMsg
@@ -284,40 +283,58 @@ class Server:
             print("Error:", errorMsg)
             return errorMsg
     
-    # Methods for Bonus Requirements
-    # Method to get the list of other clients
-    def get_clients(self, params):
-        # Get the list of clients
-        clients = list(self.clients.keys())
-        # Remove requesting client from list
-        if params[1] in clients:
-            clients.remove(params[1])
-        # Return list of other clients, indicating successful retrieval
-        return clients
-    
     # Method to allow client to message another client through unicast
     def message(self, params): 
         try:
+            # Save the source and destination client's handles
             source_name = params[1]
             dest_name = params[2]
-            msg = params[3]
+            # Save the message, allowing messages with spaces by connecting the words
+            msg = ' '.join(params[3:])
 
+            # Check if the destination client exists
             if dest_name not in self.clients.keys():
                 raise Exception("Client not found in the server.")
+            # Check if the client is trying to message themselves
             if source_name == dest_name:
                 raise Exception("Cannot message yourself.")
+            # Send the message to the messaging socket of the destination client
             dest_socket = self.clients[dest_name]["message_socket"]
             dest_socket.send(f"{source_name}: {msg}".encode('utf-8'))
 
+            # Return a response indicating successful sending of the message
             msg = f"Message sent to {dest_name}."
             print(msg)
             return msg
         except Exception as e:
+            # Print error
             errorMsg = f"{e}"
             print("Error:", errorMsg)
             return errorMsg
 
-    def message_all(self, params): pass
+    # Method to allow client to broadcast a message to all other registeredclients
+    def message_all(self, params):
+        try:
+            # Save the source client's handle
+            source_name = params[1]
+            # Save the message, allowing messages with spaces by connecting the words
+            msg = ' '.join(params[2:])
 
-    
+            # Send the message to the messaging sockets of all other clients
+            for dest_name in self.clients.keys():
+                if dest_name != source_name:
+                    dest_socket = self.clients[dest_name]["message_socket"]
+                    dest_socket.send(f"{source_name} (to all): {msg}".encode('utf-8'))
+            
+            # Return a response indicating successful broadcasting of the message
+            msg = f"Message sent to all other clients."
+            print(msg)
+            return msg
+        except Exception as e:
+            # Print error
+            errorMsg = f"{e}"
+            print("Error:", errorMsg)
+            return errorMsg
+
+# Initialize an instance of the server when ran
 server = Server()
